@@ -5,7 +5,6 @@
     <ItemGroup>
       <TemplateFiles Include="$(SolutionDir)Template\*.*" />
     </ItemGroup>
-    <Copy SourceFiles="@(TemplateFiles)" DestinationFolder="$(BaseIntermediateOutputPath)\template"/>
-    <ZipDirectory SourceDirectory="$(BaseIntermediateOutputPath)\template" DestinationFile="$(OutputPath)template.zip" Overwrite="true" />
+    <Copy SourceFiles="@(TemplateFiles)" DestinationFolder="$(OutputPath)template"/>
   </Target>
 </Project>

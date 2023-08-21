@@ -5,7 +5,7 @@ namespace HotComponent
     /// <summary>
     /// Placeholder that will be replaced with a real ad-hoc component at runtime.
     /// </summary>
-    public class PlaceholderComponent : HotComponent
+    public class PlaceholderComponent : HotComponentBase
     {
         public PlaceholderComponent() : base("Ad Hoc Placeholder", "Ad Hoc", "Placeholder for ad-hoc components") { }
 
