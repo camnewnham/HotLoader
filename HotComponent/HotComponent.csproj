@@ -23,9 +23,11 @@
   </ItemGroup>
   
   <PropertyGroup>
-	<OutputPath>$(ProjectDir)bin\</OutputPath>
-	<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-	<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+	  <OutputPath>$(ProjectDir)bin\</OutputPath>
+	  <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+	  <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>
+
+  <Import Project=".\Build.targets" />
 
 </Project>

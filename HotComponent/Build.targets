@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="Create Template" AfterTargets="CopyFilesToOutputDirectory">
+	  <Message Text="Creating template" Importance="high" />
+    <ItemGroup>
+      <TemplateFiles Include="$(SolutionDir)Template\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(TemplateFiles)" DestinationFolder="$(BaseIntermediateOutputPath)\template"/>
+    <ZipDirectory SourceDirectory="$(BaseIntermediateOutputPath)\template" DestinationFile="$(OutputPath)template.zip" Overwrite="true" />
+  </Target>
+</Project>

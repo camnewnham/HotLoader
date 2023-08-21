@@ -3,10 +3,14 @@
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <RootNamespace>$(SolutionName)</RootNamespace>
-    <Configurations>Debug;Release</Configurations>
+    <Configurations>Debug;Develop;Release</Configurations>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="'$(Configuration)'=='Develop'">
     <DebugType>full</DebugType>
   </PropertyGroup>
 
@@ -17,10 +21,16 @@
     <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.18.2" />
   </ItemGroup>
   
-  <ItemGroup>
+  <ItemGroup Condition="'$(Configuration)'!='Develop'">
     <Reference Include="HotComponent">
       <HintPath>..\HotComponent\bin\HotComponent.gha</HintPath>
-      <Private>True</Private>
+      <Private>False</Private>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)'=='Develop'">
+    <ProjectReference Include="..\HotComponent\HotComponent.csproj">
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>  
 </Project>
