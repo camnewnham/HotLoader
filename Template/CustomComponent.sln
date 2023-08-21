@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.6.33829.357
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CustomComponent", "CustomComponent.csproj", "{3EC9BE1D-EAB2-4542-8501-ECC756287F41}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Develop|Any CPU = Develop|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{05699FC3-EFEC-4120-BEC7-5DAB5494C167}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05699FC3-EFEC-4120-BEC7-5DAB5494C167}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05699FC3-EFEC-4120-BEC7-5DAB5494C167}.Develop|Any CPU.ActiveCfg = Debug|Any CPU
+		{05699FC3-EFEC-4120-BEC7-5DAB5494C167}.Develop|Any CPU.Build.0 = Debug|Any CPU
+		{05699FC3-EFEC-4120-BEC7-5DAB5494C167}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05699FC3-EFEC-4120-BEC7-5DAB5494C167}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3EC9BE1D-EAB2-4542-8501-ECC756287F41}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3EC9BE1D-EAB2-4542-8501-ECC756287F41}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3EC9BE1D-EAB2-4542-8501-ECC756287F41}.Develop|Any CPU.ActiveCfg = Develop|Any CPU
+		{3EC9BE1D-EAB2-4542-8501-ECC756287F41}.Develop|Any CPU.Build.0 = Develop|Any CPU
+		{3EC9BE1D-EAB2-4542-8501-ECC756287F41}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3EC9BE1D-EAB2-4542-8501-ECC756287F41}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CBEF915A-EA4D-4EA9-94D8-AFBA437A1421}
+	EndGlobalSection
+EndGlobal

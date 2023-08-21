@@ -2,7 +2,7 @@
 using System;
 using System.Drawing;
 
-namespace HotComponent
+namespace HotComponents
 {
     public class PluginInfo : GH_AssemblyInfo
     {

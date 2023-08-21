@@ -4,24 +4,40 @@ using Grasshopper.Kernel.Parameters;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
-namespace HotComponent
+namespace HotComponents
 {
-    public abstract class HotComponentBase : GH_Component
+    /// <summary>
+    /// Base class for implementing hot-load components.  
+    /// Contains serialization and instantiation logic. 
+    /// </summary>
+    public abstract class HotComponent : GH_Component
     {
-        private static string AssemblyTemplateFolder => Path.Combine(Path.GetDirectoryName(Assembly.GetAssembly(typeof(HotComponentBase)).Location), "template");
+        private static string AssemblyTemplateFolder => Path.Combine(Path.GetDirectoryName(Assembly.GetAssembly(typeof(HotComponent)).Location), "template");
 
         protected override System.Drawing.Bitmap Icon => null;
         public sealed override Guid ComponentGuid => new Guid("82fdaf19-4493-44f7-b394-630218e6808c");
 
-        public HotComponentBase(string name, string nickname, string description)
-          : base(name, nickname, description, "Ad Hoc", "Ad Hoc")
+        public HotComponent(string name, string nickname, string description)
+          : base(name, nickname, description, "Hot", "Hot")
         {
         }
+
+        /// <summary>
+        /// Path to the source for this component.  
+        /// May not be assigned. 
+        /// </summary>
+        private string m_sourcePath = null;
+
+        /// <summary>
+        /// Zip of the source code for this component
+        /// </summary>
+        private byte[] m_source = null;
 
         /// <summary>
         /// The binary data containing the inherited component dll. Second priority load.
@@ -61,13 +77,19 @@ namespace HotComponent
         {
             reader.TryGetInt32("inputCount", ref m_inputParamCount);
             reader.TryGetInt32("outputCount", ref m_outputParamCount);
+            reader.TryGetString("projectPath", ref m_sourcePath);
 
             if (reader.ItemExists("binary"))
             {
                 m_binary = reader.GetByteArray("binary");
             }
 
-            if (this is PlaceholderComponent)
+            if (reader.ItemExists("source"))
+            {
+                m_source = reader.GetByteArray("source");
+            }
+
+            if (this is HotComponentPlaceholder)
             {
                 m_pendingComponentLoad = m_binary != null;
 
@@ -95,9 +117,17 @@ namespace HotComponent
         {
             writer.SetInt32("inputCount", Params.Input.Count);
             writer.SetInt32("outputCount", Params.Output.Count);
+            if (m_sourcePath != null)
+            {
+                writer.SetString("projectPath", m_sourcePath);
+            }
             if (m_binary != null)
             {
                 writer.SetByteArray("binary", m_binary);
+            }
+            if (m_source != null)
+            {
+                writer.SetByteArray("source", m_source);
             }
             WriteNestedChunk(writer);
 
@@ -107,7 +137,7 @@ namespace HotComponent
         /// <summary>
         /// Reads the chunk belonging to the inherited component
         /// </summary>
-        private void ReadNestedChunk(HotComponentBase component)
+        private void ReadNestedChunk(HotComponent component)
         {
             if (m_chunk != null)
             {
@@ -213,10 +243,7 @@ namespace HotComponent
         public override void AppendAdditionalMenuItems(System.Windows.Forms.ToolStripDropDown menu)
         {
             Menu_AppendItem(menu, "Select replacement", (obj, arg) => PickReplacement()).ToolTipText = $"Select a dll containing a hot component";
-            if (this is PlaceholderComponent)
-            {
-                Menu_AppendItem(menu, "Generate project", (obj, arg) => GenerateNewProject()).ToolTipText = "Generates a .csproj from a template.";
-            }
+            Menu_AppendItem(menu, "Edit project", (obj, arg) => EditComponent()).ToolTipText = "Edits the code for this component.";
             base.AppendAdditionalMenuItems(menu);
         }
 
@@ -235,7 +262,7 @@ namespace HotComponent
             {
                 using (Stream fs = dialog.OpenFile())
                 {
-                    if (LoadComponentFromStream(fs) is HotComponentBase component)
+                    if (LoadComponentFromStream(fs) is HotComponent component)
                     {
                         ReplaceComponent(component);
                     }
@@ -243,37 +270,155 @@ namespace HotComponent
             }
         }
 
-        private void GenerateNewProject()
+        private static string GetCsProj(string path)
         {
-            Debug.Assert(this is PlaceholderComponent, "New projects should only be generated for placeholder components. Existing components should instantiate the existing source code.");
-            string folder = Path.Combine(Path.GetTempPath(), "HotComponents", Guid.NewGuid().ToString());
-            if (!Directory.Exists(folder))
+            foreach (FileInfo file in new DirectoryInfo(path).GetFiles("*.csproj"))
             {
-                Directory.CreateDirectory(folder);
+                return file.FullName;
             }
-            string csproj = null;
+            throw new FileNotFoundException($"Unable to find .csproj in {path}");
+        }
+
+        /// <summary>
+        /// Creates a new project path string
+        /// </summary>
+        /// <returns>A temporary project path</returns>
+        private static string CreateProjectPath()
+        {
+            return Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "HotComponents", Guid.NewGuid().ToString())).FullName;
+        }
+
+        /// <summary>
+        /// Generates a new csproj from a template
+        /// </summary>
+        /// <returns>The path to the generated csproject</returns>
+        private string GenerateNewProject()
+        {
+            Debug.Assert(this is HotComponentPlaceholder, "New projects should only be generated for placeholder components. Existing components should instantiate the existing source code.");
+            Debug.Assert(m_source == null, "Source was not null when generating a new project");
+            Debug.Assert(m_sourcePath == null, "Project path was not null when generating a new project");
+            string folder = CreateProjectPath();
             foreach (FileInfo file in new DirectoryInfo(AssemblyTemplateFolder).GetFiles())
             {
-                string newFilePath = Path.Combine(folder, file.Name);
-                File.Copy(file.FullName, Path.Combine(folder, newFilePath));
-                if (file.Extension == ".csproj")
-                {
-                    if (csproj != null)
-                    {
-                        throw new FileLoadException("Found multiple csproj files in template.");
-                    }
-                    csproj = newFilePath;
-                }
-            }
-            if (csproj == null)
-            {
-                throw new FileNotFoundException("CSProj was not found when generating project.");
+                File.Copy(file.FullName, Path.Combine(folder, file.Name));
             }
 
+            string csproj = GetCsProj(folder);
             UpdateAssemblyReferences(csproj);
+            CacheSource(folder);
+            return csproj;
+        }
+
+        /// <summary>
+        /// Restores the cached project into a temporary folder.
+        /// </summary>
+        private string RestoreProject()
+        {
+            if (m_source == null)
+            {
+                throw new InvalidOperationException("Can not restore a project that does not have cached source code.");
+            }
 
 
-            Process.Start(csproj);
+            string tmpZipFile = Path.Combine(Path.GetTempPath(), "HotComponents", "tmp.zip");
+            if (File.Exists(tmpZipFile)) File.Delete(tmpZipFile);
+            File.WriteAllBytes(tmpZipFile, m_source);
+            string newPath = CreateProjectPath();
+
+            ZipFile.ExtractToDirectory(tmpZipFile, newPath);
+
+            string csproj = GetCsProj(newPath);
+            UpdateAssemblyReferences(csproj);
+            return csproj;
+        }
+
+        /// <summary>
+        /// If the project already exists, open the existing file.  
+        /// If it does not exist, instantiate the template and launch it.
+        /// </summary>
+        private void EditComponent()
+        {
+            if (m_sourcePath == null)
+            {
+                if (!(this is HotComponentPlaceholder))
+                {
+                    throw new InvalidOperationException("Can not edit a component that does not have a project.");
+                }
+                string csproj = GenerateNewProject();
+                Process.Start(csproj);
+            }
+            else if (Directory.Exists(m_sourcePath))
+            {
+                Process.Start(GetCsProj(m_sourcePath));
+            }
+            else
+            {
+                Process.Start(RestoreProject());
+            }
+            UpdateAssemblyReferences(GetCsProj(m_sourcePath));
+        }
+
+        /// <summary>
+        /// Caches the source code for the current project and stores in <see cref="m_source"/>
+        /// </summary>
+        private void CacheSource(string folder)
+        {
+            m_sourcePath = folder;
+
+            if (!Directory.Exists(m_sourcePath))
+            {
+                throw new InvalidOperationException("Can not cache source code; project path does not exist.");
+            }
+
+            DirectoryInfo workingFolder = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "HotComponents", "Cache"));
+            if (workingFolder.Exists)
+            {
+                workingFolder.Delete(true);
+            }
+            workingFolder.Create();
+
+            // Copy all source except for /bin and /debug
+            CopyDirectoryRecursive(m_sourcePath, workingFolder.FullName, path => Path.GetDirectoryName(path) is string name && name != "bin" && name != "obj");
+
+            string tmpZipFile = Path.Combine(Path.GetTempPath(), "HotComponents", "tmp.zip");
+            if (File.Exists(tmpZipFile)) File.Delete(tmpZipFile);
+
+            ZipFile.CreateFromDirectory(workingFolder.FullName, tmpZipFile, CompressionLevel.Optimal, false, null);
+
+            using (FileStream fs = File.OpenRead(tmpZipFile))
+            {
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    fs.CopyTo(ms);
+                    m_source = ms.ToArray();
+                }
+            };
+        }
+
+        private static void CopyDirectoryRecursive(string sourceDir, string destinationDir, Func<string, bool> folderNameFilter = null)
+        {
+            if (folderNameFilter != null && !folderNameFilter(sourceDir)) return;
+
+            DirectoryInfo dir = new DirectoryInfo(sourceDir);
+
+            if (!dir.Exists)
+                throw new DirectoryNotFoundException($"Source directory not found: {dir.FullName}");
+
+            DirectoryInfo[] dirs = dir.GetDirectories();
+
+            Directory.CreateDirectory(destinationDir);
+
+            foreach (FileInfo file in dir.GetFiles())
+            {
+                string targetFilePath = Path.Combine(destinationDir, file.Name);
+                file.CopyTo(targetFilePath);
+            }
+
+            foreach (DirectoryInfo subDir in dirs)
+            {
+                string newDestinationDir = Path.Combine(destinationDir, subDir.Name);
+                CopyDirectoryRecursive(subDir.FullName, newDestinationDir, folderNameFilter);
+            }
         }
 
         /// <summary>
@@ -282,10 +427,10 @@ namespace HotComponent
         /// <param name="csprojPath">The path to the .csproj</param>
         private void UpdateAssemblyReferences(string csprojPath)
         {
-            string assemblyPath = Assembly.GetAssembly(typeof(HotComponentBase)).Location;
+            string assemblyPath = Assembly.GetAssembly(typeof(HotComponent)).Location;
 
             string txt = File.ReadAllText(csprojPath);
-            string replaced = new Regex(@"(?<=<HintPath>).+HotComponent.gha(?=<\/HintPath>)").Replace(txt, assemblyPath);
+            string replaced = new Regex(@"(?<=<HintPath>).+HotComponents.gha(?=<\/HintPath>)").Replace(txt, assemblyPath);
             File.WriteAllText(csprojPath, replaced);
         }
 
@@ -294,7 +439,7 @@ namespace HotComponent
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        private HotComponentBase LoadComponentFromFilePath(string path)
+        private HotComponent LoadComponentFromFilePath(string path)
         {
             using (FileStream fs = File.OpenRead(path))
             {
@@ -307,7 +452,7 @@ namespace HotComponent
         /// </summary>
         /// <param name="stream">The stream of thge dll</param>
         /// <exception cref="EntryPointNotFoundException">Thrown when either zero or multiple IGH_Component are found in the assembly.</exception>
-        private HotComponentBase LoadComponentFromStream(Stream stream)
+        private HotComponent LoadComponentFromStream(Stream stream)
         {
             using (MemoryStream ms = new MemoryStream())
             {
@@ -321,12 +466,12 @@ namespace HotComponent
         /// </summary>
         /// <param name="data">Binary representing the assembly dll</param>
         /// <returns>The component</returns>
-        private HotComponentBase LoadComponentFromByteArray(byte[] data)
+        private HotComponent LoadComponentFromByteArray(byte[] data)
         {
             Assembly assm = Assembly.Load(data);
 
             Type[] componentTypes = assm.GetExportedTypes().Where(
-                type => typeof(HotComponentBase).IsAssignableFrom(type)
+                type => typeof(HotComponent).IsAssignableFrom(type)
                 ).ToArray();
 
             if (componentTypes.Length != 1)
@@ -334,7 +479,7 @@ namespace HotComponent
                 throw new EntryPointNotFoundException($"Found {componentTypes.Length} {nameof(IGH_Component)} in assembly but expected 1.");
             }
 
-            HotComponentBase inst = Activator.CreateInstance(componentTypes[0]) as HotComponentBase;
+            HotComponent inst = Activator.CreateInstance(componentTypes[0]) as HotComponent;
             inst.m_binary = data;
 
             return inst;
@@ -344,7 +489,7 @@ namespace HotComponent
         /// Replaces the current component in the document with a new component.
         /// </summary>
         /// <param name="newComponent">The new component</param>
-        private void ReplaceComponent(HotComponentBase newComponent)
+        private void ReplaceComponent(HotComponent newComponent)
         {
             if (newComponent == null)
             {

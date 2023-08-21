@@ -1,13 +1,13 @@
 ﻿using Grasshopper.Kernel;
 
-namespace HotComponent
+namespace HotComponents
 {
     /// <summary>
     /// Placeholder that will be replaced with a real ad-hoc component at runtime.
     /// </summary>
-    public class PlaceholderComponent : HotComponentBase
+    public class HotComponentPlaceholder : HotComponent
     {
-        public PlaceholderComponent() : base("Ad Hoc Placeholder", "Ad Hoc", "Placeholder for ad-hoc components") { }
+        public HotComponentPlaceholder() : base("Hot Placeholder", "Hot", "Placeholder for hot component") { }
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {

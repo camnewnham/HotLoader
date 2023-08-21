@@ -23,14 +23,26 @@
   
   <ItemGroup Condition="'$(Configuration)'!='Develop'">
     <Reference Include="HotComponent">
-      <HintPath>..\HotComponent\bin\HotComponent.gha</HintPath>
+      <HintPath>..\Plugin\bin\HotComponents.gha</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)'=='Develop'">
-    <ProjectReference Include="..\HotComponent\HotComponent.csproj">
+    <ProjectReference Include="..\Plugin\HotComponents.csproj">
       <Private>False</Private>
     </ProjectReference>
-  </ItemGroup>  
+  </ItemGroup>
+
+    <Target Name="ILRepacker" AfterTargets="Build">
+        <ItemGroup>
+	        <InputAssemblies Include="$(OutputPath)\**\*.dll" />
+        </ItemGroup>
+        <ILRepack
+	        Internalize="true"
+	        InputAssemblies="@(InputAssemblies)"
+	        TargetKind="Dll"
+	        OutputFile="$(ProjectDir)\bin\$(AssemblyName).dll"
+        />
+    </Target>
 </Project>
