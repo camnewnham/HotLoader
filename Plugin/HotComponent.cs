@@ -8,7 +8,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using System.Windows.Forms;
 
 namespace HotComponents
 {
@@ -18,10 +17,22 @@ namespace HotComponents
     /// </summary>
     public abstract class HotComponent : GH_Component
     {
+        /// <summary>
+        /// Folder path for the template which contains an example implementation of a Hot Component
+        /// </summary>
         private static string AssemblyTemplateFolder => Path.Combine(Path.GetDirectoryName(Assembly.GetAssembly(typeof(HotComponent)).Location), "template");
-
         protected override System.Drawing.Bitmap Icon => null;
         public sealed override Guid ComponentGuid => new Guid("82fdaf19-4493-44f7-b394-630218e6808c");
+
+        /// <summary>
+        /// File system watcher waiting for compilation changes
+        /// </summary>
+        private FileSystemWatcher m_fileSystemWatcher = null;
+
+        /// <summary>
+        /// Temporary state denoting that we are currently replacing this component due to file changes
+        /// </summary>
+        private bool m_reloadingFileChanges = false;
 
         public HotComponent(string name, string nickname, string description)
           : base(name, nickname, description, "Hot", "Hot")
@@ -53,6 +64,7 @@ namespace HotComponents
         /// The number of input components at serialization time
         /// </summary>
         private int m_inputParamCount = 0;
+
         /// <summary>
         /// The number of output components at serialization time
         /// </summary>
@@ -185,23 +197,46 @@ namespace HotComponents
                 }
                 else
                 {
-                    ReplaceComponent(LoadComponentFromByteArray(m_binary));
+                    LoadComponentFromCache();
                 }
             }
+            StartFolderWatcher();
             base.AddedToDocument(document);
         }
 
+        /// <summary>
+        /// <inheritdoc />
+        /// Note to inheritors: ensure you call the base method.
+        /// </summary>
+        public override void RemovedFromDocument(GH_Document document)
+        {
+            StopFolderWatcher();
+            base.RemovedFromDocument(document);
+        }
+
+        /// <summary>
+        /// Called once after a document finishes loading.  
+        /// Used to ensure wire hookups are complete before we swap out a component.
+        /// </summary>
         private void OnDocumentContextChanged(object sender, GH_DocContextEventArgs e)
         {
             e.Document.ContextChanged -= OnDocumentContextChanged;
-            ReplaceComponent(LoadComponentFromByteArray(m_binary));
+            LoadComponentFromCache();
+        }
+
+        /// <summary>
+        /// Loads a component from the serialized binary stored in this component.
+        /// </summary>
+        private void LoadComponentFromCache()
+        {
+            ReplaceComponent(LoadComponentFromByteArray(m_binary), m_sourcePath);
+            StartFolderWatcher();
         }
 
         /// <summary>
         /// Override this to read custom data.
         /// </summary>
         /// <param name="reader">The GH reader</param>
-
         protected virtual void OnRead(GH_IReader reader) { }
         /// <summary>
         /// Override this to write custom data.  
@@ -242,34 +277,15 @@ namespace HotComponents
         /// <param name="menu">The toolstrip menu</param>
         public override void AppendAdditionalMenuItems(System.Windows.Forms.ToolStripDropDown menu)
         {
-            Menu_AppendItem(menu, "Select replacement", (obj, arg) => PickReplacement()).ToolTipText = $"Select a dll containing a hot component";
             Menu_AppendItem(menu, "Edit project", (obj, arg) => EditComponent()).ToolTipText = "Edits the code for this component.";
             base.AppendAdditionalMenuItems(menu);
         }
 
         /// <summary>
-        /// Shows a file picker and attempts dll replacement
+        /// Finds the .csproj in a folder
         /// </summary>
-        private void PickReplacement()
-        {
-            OpenFileDialog dialog = new OpenFileDialog()
-            {
-                FileName = "Select a dll or gha",
-                Filter = "Grasshopper Component Libraries (*.dll)|*.dll",
-                Title = "Select dll"
-            };
-            if (dialog.ShowDialog() == DialogResult.OK)
-            {
-                using (Stream fs = dialog.OpenFile())
-                {
-                    if (LoadComponentFromStream(fs) is HotComponent component)
-                    {
-                        ReplaceComponent(component);
-                    }
-                }
-            }
-        }
-
+        /// <param name="path">The folder path</param>
+        /// <returns>The path to the csproj in the folder</returns>
         private static string GetCsProj(string path)
         {
             foreach (FileInfo file in new DirectoryInfo(path).GetFiles("*.csproj"))
@@ -305,7 +321,7 @@ namespace HotComponents
 
             string csproj = GetCsProj(folder);
             UpdateAssemblyReferences(csproj);
-            CacheSource(folder);
+            m_sourcePath = folder;
             return csproj;
         }
 
@@ -356,6 +372,7 @@ namespace HotComponents
                 Process.Start(RestoreProject());
             }
             UpdateAssemblyReferences(GetCsProj(m_sourcePath));
+            StartFolderWatcher();
         }
 
         /// <summary>
@@ -377,8 +394,12 @@ namespace HotComponents
             }
             workingFolder.Create();
 
-            // Copy all source except for /bin and /debug
-            CopyDirectoryRecursive(m_sourcePath, workingFolder.FullName, path => Path.GetDirectoryName(path) is string name && name != "bin" && name != "obj");
+            // Copy source data
+            CopyDirectoryRecursive(m_sourcePath, workingFolder.FullName, path => Path.GetFileName(path) is string name &&
+                name != "bin" &&
+                name != "obj" &&
+                !name.StartsWith(".")
+            );
 
             string tmpZipFile = Path.Combine(Path.GetTempPath(), "HotComponents", "tmp.zip");
             if (File.Exists(tmpZipFile)) File.Delete(tmpZipFile);
@@ -395,14 +416,18 @@ namespace HotComponents
             };
         }
 
+        /// <summary>
+        /// Copies a directory recursively with a filter to exclude certain folders
+        /// </summary>
+        /// <param name="sourceDir">The source to copy</param>
+        /// <param name="destinationDir">The destination</param>
+        /// <param name="folderNameFilter">A function which returns true if a folder should be included. If null, all folders are included</param>
+        /// <exception cref="DirectoryNotFoundException"></exception>
         private static void CopyDirectoryRecursive(string sourceDir, string destinationDir, Func<string, bool> folderNameFilter = null)
         {
             if (folderNameFilter != null && !folderNameFilter(sourceDir)) return;
 
             DirectoryInfo dir = new DirectoryInfo(sourceDir);
-
-            if (!dir.Exists)
-                throw new DirectoryNotFoundException($"Source directory not found: {dir.FullName}");
 
             DirectoryInfo[] dirs = dir.GetDirectories();
 
@@ -418,6 +443,71 @@ namespace HotComponents
             {
                 string newDestinationDir = Path.Combine(destinationDir, subDir.Name);
                 CopyDirectoryRecursive(subDir.FullName, newDestinationDir, folderNameFilter);
+            }
+        }
+
+        /// <summary>
+        /// Starts watching the <see cref="m_sourcePath"/> directory for file changes.
+        /// </summary>
+        private void StartFolderWatcher()
+        {
+            StopFolderWatcher();
+            if (!Directory.Exists(m_sourcePath))
+            {
+                return;
+            }
+
+            string outputPath = Path.Combine(m_sourcePath, "bin");
+            if (!Directory.Exists(outputPath))
+            {
+                // Ensure the bin directory exists
+                Directory.CreateDirectory(outputPath);
+            }
+
+            m_fileSystemWatcher = new FileSystemWatcher(outputPath)
+            {
+                NotifyFilter = NotifyFilters.FileName,
+                EnableRaisingEvents = true,
+                Filter = "*.dll",
+                IncludeSubdirectories = false,
+            };
+            m_fileSystemWatcher.Created += OnBinaryCreated;
+        }
+
+        /// <summary>
+        /// Called when a dll file changes in the build output directory
+        /// </summary>
+        private void OnBinaryCreated(object sender, FileSystemEventArgs e)
+        {
+            if (m_reloadingFileChanges) return;
+            m_reloadingFileChanges = true;
+            StopFolderWatcher();
+            string path = e.FullPath;
+            Grasshopper.Instances.DocumentEditor.BeginInvoke((Action)(() =>
+            {
+                if (OnPingDocument() != null)
+                {
+                    CacheSource(Directory.GetParent(Path.GetDirectoryName(path)).FullName);
+                    using (FileStream fs = File.OpenRead(path))
+                    {
+                        ReplaceComponent(LoadComponentFromStream(fs), m_sourcePath);
+                    }
+                    StartFolderWatcher();
+                }
+                m_reloadingFileChanges = false;
+            }));
+        }
+
+        /// <summary>
+        /// Stops any current file system watcher.
+        /// </summary>
+        private void StopFolderWatcher()
+        {
+            if (m_fileSystemWatcher != null)
+            {
+                m_fileSystemWatcher.Created -= OnBinaryCreated;
+                m_fileSystemWatcher.Dispose();
+                m_fileSystemWatcher = null;
             }
         }
 
@@ -489,29 +579,13 @@ namespace HotComponents
         /// Replaces the current component in the document with a new component.
         /// </summary>
         /// <param name="newComponent">The new component</param>
-        private void ReplaceComponent(HotComponent newComponent)
+        private void ReplaceComponent(HotComponent newComponent, string pathToSource)
         {
-            if (newComponent == null)
-            {
-                throw new ArgumentNullException("newComponent");
-            }
+            newComponent.m_sourcePath = pathToSource;
 
             GH_Document doc = OnPingDocument();
 
-            int[] inputParamsToMigrate = new int[Math.Min(newComponent.Params.Input.Count, Params.Input.Count)];
-            int[] outputParamsToMigrate = new int[Math.Min(newComponent.Params.Output.Count, Params.Output.Count)];
-
-            for (int i = 0; i < inputParamsToMigrate.Length; i++)
-            {
-                inputParamsToMigrate[i] = i;
-            }
-            for (int i = 0; i < outputParamsToMigrate.Length; i++)
-            {
-                outputParamsToMigrate[i] = i;
-            }
-
-            GH_UpgradeUtil.MigrateInputParameters(this, newComponent, inputParamsToMigrate, inputParamsToMigrate);
-            GH_UpgradeUtil.MigrateOutputParameters(this, newComponent, outputParamsToMigrate, outputParamsToMigrate);
+            SwapWires(this, newComponent);
 
             newComponent.CreateAttributes();
             newComponent.Attributes.Pivot = Attributes.Pivot;
@@ -529,6 +603,30 @@ namespace HotComponents
                 newComponent.ExpireSolution(false);
             });
             Grasshopper.Instances.ActiveCanvas.Invalidate();
+        }
+
+        /// <summary>
+        /// Swaps input and output wires from one component to another.  
+        /// </summary>
+        /// <param name="source">The source component</param>
+        /// <param name="target">The target component</param>
+        private static void SwapWires(IGH_Component source, IGH_Component target)
+        {
+            for (int i = 0; i < Math.Min(source.Params.Input.Count, target.Params.Input.Count); i++)
+            {
+                foreach (IGH_Param paramSource in source.Params.Input[i].Sources)
+                {
+                    target.Params.Input[i].AddSource(paramSource);
+                }
+            }
+
+            for (int i = 0; i < Math.Min(source.Params.Output.Count, target.Params.Output.Count); i++)
+            {
+                foreach (IGH_Param recipient in source.Params.Output[i].Recipients)
+                {
+                    recipient.AddSource(target.Params.Output[i]);
+                }
+            }
         }
     }
 }

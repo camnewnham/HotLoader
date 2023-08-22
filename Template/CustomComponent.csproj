@@ -34,7 +34,16 @@
     </ProjectReference>
   </ItemGroup>
 
-    <Target Name="ILRepacker" AfterTargets="Build">
+	<!-- Copy to output directory for debug -->
+	<Target Name="CopyLibs" AfterTargets="Build" Condition="'$(Configuration)'=='Debug'">
+		<ItemGroup>
+			<InputAssemblies Include="$(OutputPath)\**\*.dll" />
+		</ItemGroup>
+		<Copy SourceFiles="@(InputAssembies)" DestinationFolder="$(ProjectDir)\bin" />
+	</Target>
+	
+	<!-- Repack into a single dll for release builds -->
+    <Target Name="ILRepacker" AfterTargets="Build" Condition="'$(Configuration)'!='Debug'">
         <ItemGroup>
 	        <InputAssemblies Include="$(OutputPath)\**\*.dll" />
         </ItemGroup>
@@ -42,7 +51,7 @@
 	        Internalize="true"
 	        InputAssemblies="@(InputAssemblies)"
 	        TargetKind="Dll"
-	        OutputFile="$(ProjectDir)\bin\$(AssemblyName).dll"
+	        OutputFile="$(ProjectDir)\bin\$(AssemblyName)-$([System.DateTime]::Now.ToFileTimeUtc()).dll"
         />
     </Target>
 </Project>
