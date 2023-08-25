@@ -21,13 +21,22 @@
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
-  
-  <PropertyGroup>
-	  <OutputPath>$(ProjectDir)bin\</OutputPath>
-	  <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-	  <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-  </PropertyGroup>
 
-  <Import Project=".\Build.targets" />
+	<!-- Use simple output folder structure -->
+	<PropertyGroup>
+		<OutputPath>$(ProjectDir)bin\</OutputPath>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+	</PropertyGroup>
+
+
+	<!-- Copy the template to the output folder -->
+	<Target Name="Create Template" AfterTargets="CopyFilesToOutputDirectory">
+		<Message Text="Creating template" Importance="high" />
+		<ItemGroup>
+			<TemplateFiles Include="$(SolutionDir)Template\*.*" />
+		</ItemGroup>
+		<Copy SourceFiles="@(TemplateFiles)" DestinationFolder="$(OutputPath)template"/>
+	</Target>
 
 </Project>
