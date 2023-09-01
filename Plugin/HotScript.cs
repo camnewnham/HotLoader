@@ -31,9 +31,22 @@ namespace HotLoader
 
             private void OnSolutionExpired(IGH_DocumentObject sender, GH_SolutionExpiredEventArgs e)
             {
-                if (sender.OnPingDocument() == null)
+                if (sender.OnPingDocument() is GH_Document doc)
                 {
-                    Dispose(); // Removed from document.. or document closing
+                    doc.SolutionEnd += OnSolutionEnd;
+                }
+                else
+                {
+                    Dispose(); // Removed from document or document closing
+                }
+            }
+
+            private void OnSolutionEnd(object sender, GH_SolutionEventArgs e)
+            {
+                e.Document.SolutionEnd -= OnSolutionEnd;
+                if (Component.RuntimeMessageLevel == GH_RuntimeMessageLevel.Error)
+                {
+                    Dispose();
                 }
             }
 
