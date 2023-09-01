@@ -1,9 +1,9 @@
 ﻿---
 name: HotLoader
 version: $version
-keywords: [C#, Script, Code, Hot, Editor, IDE, Component, Custom, Plugin]
+keywords: [C, CSharp, Script, Code, Hot, Editor, IDE, Component, Custom, Plugin]
 authors:
 - Cameron Newnham
-description: Write C# components on-the-fly.
+description: Write CSharp components on-the-fly.
 url: https://github.com/camnewnham/HotLoader
 icon: icon.png
