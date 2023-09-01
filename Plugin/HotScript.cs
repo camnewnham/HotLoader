@@ -75,6 +75,60 @@ namespace HotLoader
         }
 
         /// <summary>
+        /// Registers a script instance. The instance must include the function signatures AddedToDocument(GH_Document doc) and RemovedFromDocument(GH_Document doc)
+        /// </summary>
+        /// <param name="instance">The script instance</param>
+        public static void Watch(this IGH_ScriptInstance instance)
+        {
+            IGH_Component component = GetComponent(instance);
+            Watch(instance, component, CreateGenericSubscribe(instance, component.OnPingDocument()));
+        }
+
+        /// <summary>
+        /// Uses reflection to appropriately call AddedToDocument and RemovedFromDocument on a script component
+        /// </summary>
+        /// <returns>A function that is the subscriber and unsubscriber calling the referenced methods via reflection.</returns>
+        private static Func<Action> CreateGenericSubscribe(IGH_ScriptInstance instance, GH_Document doc)
+        {
+            const string addMethodName = "AddedToDocument";
+            const string removeMethodName = "RemovedFromDocument";
+
+            System.Reflection.MethodInfo addedToDocumentMethod = instance.GetType().GetMethod(addMethodName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+            if (addedToDocumentMethod == null)
+            {
+                throw new MissingMethodException($"Unable to find {addMethodName}. Did you forget to define it in your script component?");
+            }
+            System.Reflection.ParameterInfo[] addArgs = addedToDocumentMethod.GetParameters();
+            if (addArgs.Length > 1 || (addArgs.Length == 1 && addArgs[0].ParameterType != typeof(GH_Document)))
+            {
+                throw new MissingMethodException($"{addMethodName} did not have the correct arguments defined. It should have have no arguments, or a GH_Document");
+            }
+
+            System.Reflection.MethodInfo removedFromDocumentMethod = instance.GetType().GetMethod(removeMethodName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+            if (removedFromDocumentMethod == null)
+            {
+                throw new MissingMethodException($"Unable to find {removeMethodName}. Did you forget to define it in your script component?");
+            }
+            System.Reflection.ParameterInfo[] removeArgs = removedFromDocumentMethod.GetParameters();
+            if (removeArgs.Length > 1 || (removeArgs.Length == 1 && removeArgs[0].ParameterType != typeof(GH_Document)))
+            {
+                throw new MissingMethodException($"{removeMethodName} did not have the correct arguments defined. It should have have no arguments, or a GH_Document");
+            }
+
+            return () =>
+            {
+                addedToDocumentMethod.Invoke(instance, addArgs.Length == 0 ? new object[0] : new object[] { doc });
+                return () =>
+                {
+                    removedFromDocumentMethod.Invoke(instance, removeArgs.Length == 0 ? new object[0] : new object[] { doc });
+                };
+            };
+        }
+
+
+        /// <summary>
         /// Registers a script instance for lifecycle events. The lifecycle events (subscribe and unsubscribe) are called only once per script.  
         /// </summary>
         /// <param name="instance">The script instance</param>
