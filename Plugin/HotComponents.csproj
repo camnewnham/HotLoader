@@ -13,6 +13,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net48|AnyCPU'">
     <DebugType>full</DebugType>
   </PropertyGroup>
+	
+  <ItemGroup>
+    <EmbeddedResource Include="..\Template\*.*" LogicalName="Template/%(FileName)%(Extension)"/>
+  </ItemGroup>
 	  
   <ItemGroup>
     <PackageReference Include="Grasshopper" Version="6.35.21222.17001" IncludeAssets="compile;build" />
@@ -27,7 +31,4 @@
 	  <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 	  <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>
-
-  <Import Project=".\Build.targets" />
-
 </Project>

@@ -313,16 +313,43 @@ namespace HotComponents
             Debug.Assert(this is HotComponentPlaceholder, "New projects should only be generated for placeholder components. Existing components should instantiate the existing source code.");
             Debug.Assert(m_source == null, "Source was not null when generating a new project");
             Debug.Assert(m_sourcePath == null, "Project path was not null when generating a new project");
-            string folder = CreateProjectPath();
-            foreach (FileInfo file in new DirectoryInfo(AssemblyTemplateFolder).GetFiles())
-            {
-                File.Copy(file.FullName, Path.Combine(folder, file.Name));
-            }
 
+            string folder = CreateProjectPath();
+            ExtractTemplate(folder);
             string csproj = GetCsProj(folder);
             UpdateAssemblyReferences(csproj);
             m_sourcePath = folder;
             return csproj;
+        }
+
+        /// <summary>
+        /// Extracts the embedded project template to a folder
+        /// </summary>
+        /// <param name="destinationFolder">The folder to extract to</param>
+        /// <returns>The path to the csproj entry point</returns>
+        private void ExtractTemplate(string destinationFolder)
+        {
+            const string prefix = "Template/";
+            Assembly assembly = Assembly.GetAssembly(typeof(HotComponent));
+            foreach (string name in assembly.GetManifestResourceNames())
+            {
+                if (name.StartsWith(prefix))
+                {
+                    string destinationRelativePath = name.Replace(prefix, "");
+                    string destinationFullPath = Path.Combine(destinationFolder, destinationRelativePath);
+
+                    Directory.CreateDirectory(Path.GetDirectoryName(destinationFullPath));
+
+                    using (Stream readStream = assembly.GetManifestResourceStream(name))
+                    {
+                        using (FileStream writeStream = File.OpenWrite(destinationFullPath))
+                        {
+                            readStream.CopyTo(writeStream);
+                        }
+                    }
+
+                }
+            };
         }
 
         /// <summary>

@@ -3,7 +3,7 @@
     "HotComponent": {
       "commandName": "Executable",
       "executablePath": "C:\\Program Files\\Rhino 7\\System\\Rhino.exe",
-      "commandLineArgs": ""
+      "commandLineArgs": "/nosplash /runscript=\"Grasshopper\""
     }
   }
 }
