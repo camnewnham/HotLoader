@@ -1,17 +1,28 @@
 ﻿using Grasshopper.Kernel;
+using System.Collections.Generic;
 
-namespace HotComponents
+namespace HotLoader
 {
     /// <summary>
-    /// Placeholder that will be replaced with a real ad-hoc component at runtime.
+    /// Placeholder that will be replaced with a real hot component at runtime.
     /// </summary>
-    public class HotComponentPlaceholder : HotComponent
+    public class HotComponentPlaceholder : HotComponentBase
     {
-        public HotComponentPlaceholder() : base("Hot Placeholder", "Hot", "Placeholder for hot component") { }
+        public override IEnumerable<string> Keywords => new string[]
+        {
+            "C#",
+            "C",
+            "Sharp",
+            "CSharp",
+            "Script",
+            "Hot"
+        };
+
+        public HotComponentPlaceholder() : base("C# Component", "C#", "A custom component written in C#") { }
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {
-            AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "This is a placeholder. Create a project or load a dll from the right click menu.");
+            AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "This is a placeholder. Double click to edit the source code with your native C# editor.");
         }
     }
 }

@@ -1,10 +1,10 @@
 ﻿using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
-using HotComponents;
+using HotLoader;
 
-public class MyCustomComponent : HotComponent
+public class MyHotComponent : HotComponentBase
 {
-    public MyCustomComponent() : base("Custom Component", "Custom", "My custom addition component")
+    public MyHotComponent() : base("Custom Component", "Custom", "My custom addition component")
     {
     }
 

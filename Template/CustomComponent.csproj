@@ -24,21 +24,21 @@
   
   <ItemGroup Condition="'$(Configuration)'!='Develop'">
     <Reference Include="HotComponent">
-      <HintPath>..\Plugin\bin\HotComponents.gha</HintPath>
+      <HintPath>..\Plugin\bin\HotLoader.gha</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)'=='Develop'">
-    <ProjectReference Include="..\Plugin\HotComponents.csproj">
+    <ProjectReference Include="..\Plugin\HotLoader.csproj">
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
 
 	<!-- Copy to output directory  -->
-	<Target Name="CopyLibs" BeforeTargets="CopyFilesToOutputDirectory">
+	<Target Name="SetOutputDir" BeforeTargets="BeforeBuild">
 		<PropertyGroup>
-			<OutDir>$(ProjectDir)\bin\$([System.DateTime]::Now.ToFileTimeUtc())</OutDir>
+			<OutDir>$(ProjectDir)\bin\$([System.DateTime]::Now.ToFileTimeUtc())\</OutDir>
 		</PropertyGroup>
 		<Message Text="Output directory set to: $(OutDir)" Importance="high" />
 	</Target>

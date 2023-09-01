@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace HotComponents
+namespace HotLoader
 {
     /// <summary>
     /// Hotscript manages lifecycle events for script components.  
@@ -65,9 +65,9 @@ namespace HotComponents
         /// <param name="subscribe">An action that performs initialization such as subscribing to events.</param>
         /// <param name="unsubscribe">An action that performs cleanup actions such as unsubscribing from events.</param>
 
-        public static void Register(this IGH_ScriptInstance instance, Action subscribe, Action unsubscribe)
+        public static void Watch(this IGH_ScriptInstance instance, Action subscribe, Action unsubscribe)
         {
-            Register(instance, GetComponent(instance), () =>
+            Watch(instance, GetComponent(instance), () =>
             {
                 subscribe();
                 return unsubscribe;
@@ -79,9 +79,9 @@ namespace HotComponents
         /// </summary>
         /// <param name="instance">The script instance</param>
         /// <param name="subscribe">A subscription action that returns and unsubscription action.</param>
-        public static void Register(this IGH_ScriptInstance instance, Func<Action> subscribe)
+        public static void Watch(this IGH_ScriptInstance instance, Func<Action> subscribe)
         {
-            Register(instance, GetComponent(instance), subscribe);
+            Watch(instance, GetComponent(instance), subscribe);
         }
 
         /// <summary>
@@ -90,7 +90,7 @@ namespace HotComponents
         /// <param name="instance">The script instance</param>
         /// <param name="component">The component that owns the instance</param>
         /// <param name="subscribe">A subscription action that returns and unsubscription action.</param>
-        public static void Register(this IGH_ScriptInstance instance, IGH_Component component, Func<Action> subscribe)
+        public static void Watch(this IGH_ScriptInstance instance, IGH_Component component, Func<Action> subscribe)
         {
             if (instanceMap.TryGetValue(component, out ScriptInstance existing))
             {
