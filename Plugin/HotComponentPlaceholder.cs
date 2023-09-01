@@ -1,5 +1,4 @@
 ﻿using Grasshopper.Kernel;
-using System.Collections.Generic;
 
 namespace HotLoader
 {
@@ -8,17 +7,7 @@ namespace HotLoader
     /// </summary>
     public class HotComponentPlaceholder : HotComponentBase
     {
-        public override IEnumerable<string> Keywords => new string[]
-        {
-            "C#",
-            "C",
-            "Sharp",
-            "CSharp",
-            "Script",
-            "Hot"
-        };
-
-        public HotComponentPlaceholder() : base("C# Component", "C#", "A custom component written in C#") { }
+        public HotComponentPlaceholder() : base("Custom C# Component", "C#", "A custom component written in C#") { }
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {
