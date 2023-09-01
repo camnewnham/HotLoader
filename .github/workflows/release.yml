@@ -19,7 +19,7 @@ jobs:
         run: echo "BUILD_VERSION=$($env:GITHUB_REF_NAME.Split("v")[-1])" >> $env:GITHUB_ENV
 
       - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.0.2
+        uses: microsoft/setup-msbuild@v1.1
 
       - name: Run MSBuild
         run: msbuild /restore /p:Configuration=Release
