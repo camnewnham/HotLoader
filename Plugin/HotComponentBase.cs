@@ -17,7 +17,7 @@ namespace HotLoader
     /// </summary>
     public abstract class HotComponentBase : GH_Component
     {
-        protected override System.Drawing.Bitmap Icon => Resources.logo;
+        protected override System.Drawing.Bitmap Icon => Resources.icon;
 
         public sealed override Guid ComponentGuid => new Guid("82fdaf19-4493-44f7-b394-630218e6808c");
         public sealed override GH_Exposure Exposure => GH_Exposure.tertiary;

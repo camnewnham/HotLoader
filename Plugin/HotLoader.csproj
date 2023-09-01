@@ -10,12 +10,30 @@
     <BaseOutputPath></BaseOutputPath>
   </PropertyGroup>
 	
-  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net48|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <DebugType>full</DebugType>
   </PropertyGroup>
-	
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+  
   <ItemGroup>
     <EmbeddedResource Include="..\Template\*.*" LogicalName="Template/%(FileName)%(Extension)" />
+  </ItemGroup>
+	
+  <ItemGroup>
+    <None Remove="icon.png" />
+    <None Remove="manifest.yml" />
+  </ItemGroup>
+	
+  <ItemGroup>
+    <Content Include="manifest.yml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 	  
   <ItemGroup>

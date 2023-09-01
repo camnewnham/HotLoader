@@ -1,0 +1,42 @@
+name: Yak Publish
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  YAK_TOKEN: ${{ secrets.YAK_TOKEN }}
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Get Version
+        run: echo "BUILD_VERSION=$($env:GITHUB_REF_NAME.Split("v")[-1])" >> $env:GITHUB_ENV
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.0.2
+
+      - name: Run MSBuild
+        run: msbuild /restore /p:Configuration=Release
+
+      - name: Install Yak
+        run: curl https://files.mcneel.com/yak/tools/latest/yak.exe -o yak.exe
+
+      - name: Yak Win7
+        working-directory: ./Plugin/bin
+        run: |
+          ..\..\yak build --version $env:BUILD_VERSION
+          ..\..\yak push (dir *.yak).Name
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ env.BUILD_VERSION }}

@@ -6,13 +6,13 @@ namespace HotLoader
 {
     public class PluginInfo : GH_AssemblyInfo
     {
-        public override string Name => "Hot Script";
+        public override string Name => "HotLoader";
 
         //Return a 24x24 pixel bitmap to represent this GHA library.
-        public override Bitmap Icon => Resources.logo;
+        public override Bitmap Icon => Resources.icon;
 
         //Return a short string describing the purpose of this GHA library.
-        public override string Description => "Ad hoc components for hot-loading";
+        public override string Description => "Write C# components on-the-fly.";
 
         public override Guid Id => new Guid("af2b08ae-f8c1-4131-8475-9df2c44e17e3");
 
