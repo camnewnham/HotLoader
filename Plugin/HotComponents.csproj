@@ -25,7 +25,7 @@
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
-  
+  <!-- Use simple output folder structure -->
   <PropertyGroup>
 	  <OutputPath>$(ProjectDir)bin\</OutputPath>
 	  <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

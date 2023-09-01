@@ -4,6 +4,8 @@
     <TargetFramework>net48</TargetFramework>
     <RootNamespace>$(SolutionName)</RootNamespace>
     <Configurations>Debug;Develop;Release</Configurations>
+	<!-- Change the extension so that we can watch it easily -->
+	<TargetExt>.ghc</TargetExt>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
@@ -18,7 +20,6 @@
     <PackageReference Include="Grasshopper" Version="6.35.21222.17001">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.18.2" />
   </ItemGroup>
   
   <ItemGroup Condition="'$(Configuration)'!='Develop'">
@@ -34,24 +35,11 @@
     </ProjectReference>
   </ItemGroup>
 
-	<!-- Copy to output directory for debug -->
-	<Target Name="CopyLibs" AfterTargets="Build" Condition="'$(Configuration)'=='Debug'">
-		<ItemGroup>
-			<InputAssemblies Include="$(OutputPath)\**\*.dll" />
-		</ItemGroup>
-		<Copy SourceFiles="@(InputAssembies)" DestinationFolder="$(ProjectDir)\bin" />
+	<!-- Copy to output directory  -->
+	<Target Name="CopyLibs" BeforeTargets="CopyFilesToOutputDirectory">
+		<PropertyGroup>
+			<OutDir>$(ProjectDir)\bin\$([System.DateTime]::Now.ToFileTimeUtc())</OutDir>
+		</PropertyGroup>
+		<Message Text="Output directory set to: $(OutDir)" Importance="high" />
 	</Target>
-	
-	<!-- Repack into a single dll for release builds -->
-    <Target Name="ILRepacker" AfterTargets="Build" Condition="'$(Configuration)'!='Debug'">
-        <ItemGroup>
-	        <InputAssemblies Include="$(OutputPath)\**\*.dll" />
-        </ItemGroup>
-        <ILRepack
-	        Internalize="true"
-	        InputAssemblies="@(InputAssemblies)"
-	        TargetKind="Dll"
-	        OutputFile="$(ProjectDir)\bin\$(AssemblyName)-$([System.DateTime]::Now.ToFileTimeUtc()).dll"
-        />
-    </Target>
 </Project>

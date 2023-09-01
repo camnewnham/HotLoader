@@ -25,6 +25,21 @@ namespace HotComponents
         public sealed override Guid ComponentGuid => new Guid("82fdaf19-4493-44f7-b394-630218e6808c");
 
         /// <summary>
+        /// Extensions we can resolve to assemblies
+        /// </summary>
+        private static string[] dll_extensions = new string[]
+        {
+            ".dll",
+            ".gha",
+            ".ghc"
+        };
+
+        private static string[] ignored_folders = new string[]
+        {
+            "bin", "obj"
+        };
+
+        /// <summary>
         /// File system watcher waiting for compilation changes
         /// </summary>
         private FileSystemWatcher m_fileSystemWatcher = null;
@@ -53,7 +68,13 @@ namespace HotComponents
         /// <summary>
         /// The binary data containing the inherited component dll. Second priority load.
         /// </summary>
-        private byte[] m_binary = null;
+        private byte[] m_compiled = null;
+
+        /// <summary>
+        /// Path to the compiled binaries for this component.  
+        /// May not be assigned. 
+        /// </summary>
+        private string m_compiledPath = null;
 
         /// <summary>
         /// Serialized data belonging to the child (inherited) component.
@@ -90,10 +111,11 @@ namespace HotComponents
             reader.TryGetInt32("inputCount", ref m_inputParamCount);
             reader.TryGetInt32("outputCount", ref m_outputParamCount);
             reader.TryGetString("projectPath", ref m_sourcePath);
+            reader.TryGetString("compiledBinaryPath", ref m_compiledPath);
 
-            if (reader.ItemExists("binary"))
+            if (reader.ItemExists("compiledBinaries"))
             {
-                m_binary = reader.GetByteArray("binary");
+                m_compiled = reader.GetByteArray("compiledBinaries");
             }
 
             if (reader.ItemExists("source"))
@@ -103,7 +125,7 @@ namespace HotComponents
 
             if (this is HotComponentPlaceholder)
             {
-                m_pendingComponentLoad = m_binary != null;
+                m_pendingComponentLoad = m_compiled != null;
 
                 for (int i = 0; i < m_inputParamCount; i++)
                 {
@@ -129,13 +151,17 @@ namespace HotComponents
         {
             writer.SetInt32("inputCount", Params.Input.Count);
             writer.SetInt32("outputCount", Params.Output.Count);
+            if (m_compiledPath != null)
+            {
+                writer.SetString("compiledBinaryPath", m_compiledPath);
+            }
             if (m_sourcePath != null)
             {
                 writer.SetString("projectPath", m_sourcePath);
             }
-            if (m_binary != null)
+            if (m_compiled != null)
             {
-                writer.SetByteArray("binary", m_binary);
+                writer.SetByteArray("compiledBinaries", m_compiled);
             }
             if (m_source != null)
             {
@@ -201,6 +227,7 @@ namespace HotComponents
                 }
             }
             StartFolderWatcher();
+            AppDomain.CurrentDomain.AssemblyResolve += ResolveAssemblyPath;
             base.AddedToDocument(document);
         }
 
@@ -211,6 +238,7 @@ namespace HotComponents
         public override void RemovedFromDocument(GH_Document document)
         {
             StopFolderWatcher();
+            AppDomain.CurrentDomain.AssemblyResolve -= ResolveAssemblyPath;
             base.RemovedFromDocument(document);
         }
 
@@ -222,15 +250,6 @@ namespace HotComponents
         {
             e.Document.ContextChanged -= OnDocumentContextChanged;
             LoadComponentFromCache();
-        }
-
-        /// <summary>
-        /// Loads a component from the serialized binary stored in this component.
-        /// </summary>
-        private void LoadComponentFromCache()
-        {
-            ReplaceComponent(LoadComponentFromByteArray(m_binary), m_sourcePath);
-            StartFolderWatcher();
         }
 
         /// <summary>
@@ -277,7 +296,7 @@ namespace HotComponents
         /// <param name="menu">The toolstrip menu</param>
         public override void AppendAdditionalMenuItems(System.Windows.Forms.ToolStripDropDown menu)
         {
-            Menu_AppendItem(menu, "Edit project", (obj, arg) => EditComponent()).ToolTipText = "Edits the code for this component.";
+            Menu_AppendItem(menu, "Edit project", (obj, arg) => EditSourceProject()).ToolTipText = "Edits the code for this component.";
             base.AppendAdditionalMenuItems(menu);
         }
 
@@ -296,19 +315,42 @@ namespace HotComponents
         }
 
         /// <summary>
+        /// Finds the .ghc in a folder
+        /// </summary>
+        /// <param name="path">The folder path</param>
+        /// <returns>The path to the ghc in the folder</returns>
+        private static string GetComponentDll(string path)
+        {
+            foreach (FileInfo file in new DirectoryInfo(path).GetFiles("*.ghc"))
+            {
+                return file.FullName;
+            }
+            throw new FileNotFoundException($"Unable to find .ghc in {path}");
+        }
+
+        /// <summary>
         /// Creates a new project path string
         /// </summary>
         /// <returns>A temporary project path</returns>
         private static string CreateProjectPath()
         {
-            return Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "HotComponents", Guid.NewGuid().ToString())).FullName;
+            return Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "HotComponents", "Source", Guid.NewGuid().ToString())).FullName;
+        }
+
+        /// <summary>
+        /// Creates a new build path string
+        /// </summary>
+        /// <returns>A temporary build output path</returns>
+        private static string CreateOutputPath()
+        {
+            return Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "HotComponents", "Builds", Guid.NewGuid().ToString())).FullName;
         }
 
         /// <summary>
         /// Generates a new csproj from a template
         /// </summary>
         /// <returns>The path to the generated csproject</returns>
-        private string GenerateNewProject()
+        private string GenerateSourceProject()
         {
             Debug.Assert(this is HotComponentPlaceholder, "New projects should only be generated for placeholder components. Existing components should instantiate the existing source code.");
             Debug.Assert(m_source == null, "Source was not null when generating a new project");
@@ -355,7 +397,7 @@ namespace HotComponents
         /// <summary>
         /// Restores the cached project into a temporary folder.
         /// </summary>
-        private string RestoreProject()
+        private string RestoreSourceProject()
         {
             if (m_source == null)
             {
@@ -363,7 +405,8 @@ namespace HotComponents
             }
 
 
-            string tmpZipFile = Path.Combine(Path.GetTempPath(), "HotComponents", "tmp.zip");
+            string tmpZipFile = Path.Combine(Path.GetTempPath(), "HotComponents", "tmp_source_restore.zip");
+            Directory.CreateDirectory(Path.GetDirectoryName(tmpZipFile));
             if (File.Exists(tmpZipFile)) File.Delete(tmpZipFile);
             File.WriteAllBytes(tmpZipFile, m_source);
             string newPath = CreateProjectPath();
@@ -372,6 +415,7 @@ namespace HotComponents
 
             string csproj = GetCsProj(newPath);
             UpdateAssemblyReferences(csproj);
+            m_sourcePath = newPath;
             return csproj;
         }
 
@@ -379,7 +423,7 @@ namespace HotComponents
         /// If the project already exists, open the existing file.  
         /// If it does not exist, instantiate the template and launch it.
         /// </summary>
-        private void EditComponent()
+        private void EditSourceProject()
         {
             if (m_sourcePath == null)
             {
@@ -387,7 +431,7 @@ namespace HotComponents
                 {
                     throw new InvalidOperationException("Can not edit a component that does not have a project.");
                 }
-                string csproj = GenerateNewProject();
+                string csproj = GenerateSourceProject();
                 Process.Start(csproj);
             }
             else if (Directory.Exists(m_sourcePath))
@@ -396,7 +440,7 @@ namespace HotComponents
             }
             else
             {
-                Process.Start(RestoreProject());
+                Process.Start(RestoreSourceProject());
             }
             UpdateAssemblyReferences(GetCsProj(m_sourcePath));
             StartFolderWatcher();
@@ -423,12 +467,11 @@ namespace HotComponents
 
             // Copy source data
             CopyDirectoryRecursive(m_sourcePath, workingFolder.FullName, path => Path.GetFileName(path) is string name &&
-                name != "bin" &&
-                name != "obj" &&
+                !ignored_folders.Contains(name) &&
                 !name.StartsWith(".")
             );
 
-            string tmpZipFile = Path.Combine(Path.GetTempPath(), "HotComponents", "tmp.zip");
+            string tmpZipFile = Path.Combine(Path.GetTempPath(), "HotComponents", "tmp_source_cache.zip");
             if (File.Exists(tmpZipFile)) File.Delete(tmpZipFile);
 
             ZipFile.CreateFromDirectory(workingFolder.FullName, tmpZipFile, CompressionLevel.Optimal, false, null);
@@ -495,8 +538,8 @@ namespace HotComponents
             {
                 NotifyFilter = NotifyFilters.FileName,
                 EnableRaisingEvents = true,
-                Filter = "*.dll",
-                IncludeSubdirectories = false,
+                Filter = "*.ghc",
+                IncludeSubdirectories = true,
             };
             m_fileSystemWatcher.Created += OnBinaryCreated;
         }
@@ -514,10 +557,12 @@ namespace HotComponents
             {
                 if (OnPingDocument() != null)
                 {
-                    CacheSource(Directory.GetParent(Path.GetDirectoryName(path)).FullName);
+                    // Path is /build/<id>/myComponent.ghc
+                    CacheSource(m_sourcePath);
+                    CacheBinaries(Path.GetDirectoryName(path));
                     using (FileStream fs = File.OpenRead(path))
                     {
-                        ReplaceComponent(LoadComponentFromStream(fs), m_sourcePath);
+                        ReplaceComponent(LoadComponentFromStream(fs));
                     }
                     StartFolderWatcher();
                 }
@@ -549,6 +594,108 @@ namespace HotComponents
             string txt = File.ReadAllText(csprojPath);
             string replaced = new Regex(@"(?<=<HintPath>).+HotComponents.gha(?=<\/HintPath>)").Replace(txt, assemblyPath);
             File.WriteAllText(csprojPath, replaced);
+        }
+
+        /// <summary>
+        /// Caches the output binaries for the current project and stores in <see cref="m_compiledPath"/>
+        /// </summary>
+        private void CacheBinaries(string folder)
+        {
+            m_compiledPath = folder;
+
+            if (!Directory.Exists(m_compiledPath))
+            {
+                throw new InvalidOperationException("Can not cache binaries; project path does not exist.");
+            }
+
+            DirectoryInfo workingFolder = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "HotComponents", "Cache2"));
+            if (workingFolder.Exists)
+            {
+                workingFolder.Delete(true);
+            }
+            workingFolder.Create();
+
+            CopyDirectoryRecursive(m_compiledPath, workingFolder.FullName);
+
+            string tmpZipFile = Path.Combine(Path.GetTempPath(), "HotComponents", "tmp_binary_cache.zip");
+            if (File.Exists(tmpZipFile)) File.Delete(tmpZipFile);
+
+            ZipFile.CreateFromDirectory(workingFolder.FullName, tmpZipFile, CompressionLevel.Optimal, false, null);
+
+            using (FileStream fs = File.OpenRead(tmpZipFile))
+            {
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    fs.CopyTo(ms);
+                    m_compiled = ms.ToArray();
+                }
+            };
+        }
+
+        /// <summary>
+        /// Extracts the source binaries and updates the <see cref="m_compiledPath"/>  
+        /// Returns the path to the entry point
+        /// </summary>
+        private string RestoreBinaries()
+        {
+            if (m_compiled == null)
+            {
+                throw new InvalidOperationException("Can not restore a project that does not have cached binaries.");
+            }
+
+            string tmpZipFile = Path.Combine(Path.GetTempPath(), "HotComponents", "tmp_binary_restore.zip");
+            Directory.CreateDirectory(Path.GetDirectoryName(tmpZipFile));
+            if (File.Exists(tmpZipFile)) File.Delete(tmpZipFile);
+            File.WriteAllBytes(tmpZipFile, m_compiled);
+            string newPath = CreateOutputPath();
+
+            ZipFile.ExtractToDirectory(tmpZipFile, newPath);
+
+            return GetComponentDll(newPath);
+        }
+
+        private Assembly ResolveAssemblyPath(object sender, ResolveEventArgs args)
+        {
+            if (m_compiledPath is string path && !string.IsNullOrEmpty(path))
+            {
+                foreach (string ext in dll_extensions)
+                {
+                    string expected = Path.Combine(m_compiledPath, args.Name + ext);
+                    if (File.Exists(expected))
+                    {
+                        return Assembly.LoadFile(expected);
+                    }
+
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Loads a component from the serialized binary stored in this component.
+        /// </summary>
+        private void LoadComponentFromCache()
+        {
+            string entryPoint;
+            if (!string.IsNullOrEmpty(m_compiledPath))
+            {
+                if (!Directory.Exists(m_compiledPath))
+                {
+                    entryPoint = RestoreBinaries();
+                    m_compiledPath = Path.GetDirectoryName(entryPoint);
+                }
+                else
+                {
+                    entryPoint = GetComponentDll(m_compiledPath);
+                }
+            }
+            else
+            {
+                throw new InvalidOperationException("Can not load binaries; no path cached.");
+            }
+
+            ReplaceComponent(LoadComponentFromFilePath(entryPoint));
+            StartFolderWatcher();
         }
 
         /// <summary>
@@ -597,8 +744,6 @@ namespace HotComponents
             }
 
             HotComponent inst = Activator.CreateInstance(componentTypes[0]) as HotComponent;
-            inst.m_binary = data;
-
             return inst;
         }
 
@@ -606,9 +751,12 @@ namespace HotComponents
         /// Replaces the current component in the document with a new component.
         /// </summary>
         /// <param name="newComponent">The new component</param>
-        private void ReplaceComponent(HotComponent newComponent, string pathToSource)
+        private void ReplaceComponent(HotComponent newComponent)
         {
-            newComponent.m_sourcePath = pathToSource;
+            newComponent.m_source = m_source;
+            newComponent.m_sourcePath = m_sourcePath;
+            newComponent.m_compiled = m_compiled;
+            newComponent.m_compiledPath = m_compiledPath;
 
             GH_Document doc = OnPingDocument();
 
@@ -617,13 +765,10 @@ namespace HotComponents
             newComponent.CreateAttributes();
             newComponent.Attributes.Pivot = Attributes.Pivot;
             newComponent.Attributes.ExpireLayout();
-            doc.DestroyAttributeCache();
-            doc.DestroyObjectTable();
-            int index = doc.Objects.IndexOf(this);
-            doc.RemoveObject(this, update: false);
+            doc.RemoveObject(this, false);
 
             ReadNestedChunk(newComponent);
-            doc.AddObject(newComponent, update: false, index);
+            doc.AddObject(newComponent, false);
 
             doc.ScheduleSolution(5, (_) =>
             {
