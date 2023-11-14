@@ -453,15 +453,27 @@ namespace HotLoader
                     throw new InvalidOperationException("Can not edit a component that does not have a project.");
                 }
                 string csproj = GenerateSourceProject();
-                Process.Start(csproj);
+                Process.Start(new ProcessStartInfo()
+                {
+                    FileName = csproj,
+                    UseShellExecute = true
+                });
             }
             else if (Directory.Exists(m_sourcePath))
             {
-                Process.Start(GetCsProj(m_sourcePath));
+                Process.Start(new ProcessStartInfo()
+                {
+                    FileName = GetCsProj(m_sourcePath),
+                    UseShellExecute = true
+                });
             }
             else
             {
-                Process.Start(RestoreSourceProject());
+                Process.Start(new ProcessStartInfo()
+                {
+                    FileName = RestoreSourceProject(),
+                    UseShellExecute = true
+                });
             }
             UpdateAssemblyReferences(GetCsProj(m_sourcePath));
             StartFolderWatcher();
