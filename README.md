@@ -3,11 +3,7 @@
 
 # HotLoader
 
-Hotloader extends Grasshopper's scripting tools by enhancing the capabilities of the Script Editor and allowing ad-hoc creation of components.
-
-## HotComponent
-
-HotComponent is a plugin that enables writing and distributing C# plugins on the fly using native code editors.
+Hotloader extends Grasshopper's scripting tools by allowing you to write, debug, load C# plugins that are hot-loaded at runtime.
 
 ### Why
 
@@ -20,7 +16,7 @@ HotComponent is a plugin that enables writing and distributing C# plugins on the
 
 Some of these challenges are assisted in isolation by tools such as [Script Parasite](https://github.com/arendvw/ScriptParasite) or the [new script editor in Rhino 8](https://discourse.mcneel.com/t/rhino-8-feature-scripteditor-cpython-csharp/128353), or even just the [project templates](https://marketplace.visualstudio.com/items?itemName=McNeel.Rhino7Templates2022).
 
-`HotComponent` became feasible with the introduction of [Yak](https://developer.rhino3d.com/guides/yak/what-is-yak/) - as until now it would have been inconvient to share HotComponents because the user would have to pre-install a plugin to load them. Now, the user simply needs to accept the prompt to install `HotLoader` and the definition will open as normal.
+`HotComponent` became feasible with the introduction of [Yak](https://developer.rhino3d.com/guides/yak/what-is-yak/) - as until now it would have been inconvenient to share HotComponents because the user would have to pre-install a plugin to load them. Now, the user simply needs to accept the prompt to install `HotLoader` and the definition will open as normal.
 
 ### Who
 
@@ -52,93 +48,6 @@ From the end-user's perspective (if it's not you!) a HotComponent is indistingui
 ![HotComponent Example](Assets/hotcomponent_example.gif)
 
 `HotComponent` works on both Mac and Windows, and HotComponents are editable with any tool that can compile a `.csproj` - tested with `Visual Studio 2022` and `Visual Studio for Mac`.
-
-## HotScript
-
-HotScript is a C# API that adds lifecycle events to regular Grasshopper C# scripting components.
-
-### Why
-
-To subscribe and unsubscribe from events.
-
-If you subscribe to an event in a script component, there are many scenarios where you will lose the chance to unsubscribe from the event. The most difficult to catch is when the source code changes, but the component still remains active, which is why `HotScript` exists. It tracks when the _script_ is added or removed to the document, rather than the script _component_.
-
-In normal precompiled plugins, `AddedToDocument` and `RemovedFromDocument` provide an opportunity for initialization and disposal. These don't exist for scripting components, limiting their usefulness for anything event-based, for example sensor input or websockets.
-
-### Who
-
-`HotScript` is designed for people who need to interface ad-hoc with external tools or libaries that require persistent connections or event subscriptions.
-
-### How
-
-`HotScript.Watch` provides a variety of method signatures all with the same goal: allow the user to define the two missing methods, `AddedToDocument` and `RemovedFromDocument`.
-
-1. Add a reference to `HotLoader.gha` by right clicking on your C# Script component and going to "Manage Assemblies". Ensure you change the search type to ".gha" and navigate to the install location.
-
-2. In `RunScript`, tell `HotScript` to monitor the lifecycle of your component:
-
-```C#
-HotLoader.HotScript.Watch(this);
-```
-
-3. In `Custom Additional Code`, define your `AddedToDocument` and `RemovedFromDocument` methods.
-
-```C#
-void AddedToDocument() {
-	Rhino.RhinoApp.WriteLine("Initialize: " + Component.NickName);
-
-}
-
-void RemovedFromDocument() {
-	Rhino.RhinoApp.WriteLine("Deinitialize: " + Component.NickName);
-}
-```
-
-![HotScript Example](Assets/hotscript_example.jpg)
-
-Alternatively, the same code could be condensed using a lambda function in `RunScript`:
-
-```C#
-HotLoader.HotScript.Watch(this, () =>  {
-	Rhino.RhinoApp.WriteLine("Initialize: " + Component.NickName);
-	}, () => {
-	Rhino.RhinoApp.WriteLine("Deinitialize: " + Component.NickName);
-	});
-```
-
-### Example
-
-This example creates an object, subscribes to an event, updates the counter, and schedules the component to update and output the new count. When the component is deleted or the document is closed, the event is unsubscribed and the object is disposed.
-
-```C#
-private void RunScript(ref object Count)
-{
-	HotLoader.HotScript.Watch(this);
-	Count = count;
-}
-
-// <Custom additional code>
-  int count = 0;
-  MyExampleObject myObj;
-
-  void AddedToDocument() {
-    myObj = new MyExampleObject();
-    myObj.Updated += OnMyEventUpdated;
-  }
-
-  void RemovedFromDocument() {
-    myObj.Updated -= OnMyEventUpdated;
-    myObj.Dispose();
-  }
-
-  void OnMyEventUpdated(object sender, EventArgs args) {
-    count++;
-    HotLoader.HotScript.ScheduleSolution(this);
-  }
-// </Custom additional code>
-```
-
-Note that `HotScript.ScheduleSolution` is a utility method; the component can be expired by any normal means.
 
 # Contributing
 
