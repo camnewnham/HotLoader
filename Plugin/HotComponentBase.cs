@@ -816,6 +816,7 @@ namespace HotLoader
             newComponent.CreateAttributes();
             newComponent.Attributes.Pivot = Attributes.Pivot;
             newComponent.Attributes.ExpireLayout();
+            newComponent.Locked = Locked;
             doc.RemoveObject(this, false);
 
             ReadNestedChunk(newComponent);
