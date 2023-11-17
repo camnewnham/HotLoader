@@ -1,4 +1,5 @@
-![Yak Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fyak.rhino3d.com%2Fpackages%2FHotLoader&query=%24.version&suffix=%20&logo=Rhinoceros&label=Yak)
+<a href="https://www.food4rhino.com/app/hotloader"><img alt="Yak Badge" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fyak.rhino3d.com%2Fpackages%2FHotLoader&query=%24.version&suffix=%20&logo=Rhinoceros&label=Yak">
+</a>
 
 # HotLoader
 
