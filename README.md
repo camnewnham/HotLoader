@@ -1,3 +1,5 @@
+![Yak Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fyak.rhino3d.com%2Fpackages%2FHotLoader&query=%24.version&suffix=%20&logo=Rhinoceros&label=Yak)
+
 # HotLoader
 
 Hotloader extends Grasshopper's scripting tools by enhancing the capabilities of the Script Editor and allowing ad-hoc creation of components.
