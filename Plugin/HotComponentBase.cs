@@ -314,6 +314,8 @@ namespace HotLoader
         public override void AppendAdditionalMenuItems(System.Windows.Forms.ToolStripDropDown menu)
         {
             Menu_AppendItem(menu, "Edit project", (obj, arg) => EditSourceProject()).ToolTipText = "Edits the code for this component.";
+            Menu_AppendItem(menu, "Use as default template", (obj, arg) => SaveCurrentSourceAsCustomTemplate())
+                .ToolTipText = "Saves the current source code as the default template for new components.";
             base.AppendAdditionalMenuItems(menu);
         }
 
@@ -364,6 +366,28 @@ namespace HotLoader
         }
 
         /// <summary>
+        /// Path to folder in Application data where custom default templates are stored.
+        /// </summary>
+        private static string GetCustomTemplateDir()
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
+                "HotLoader", 
+                "DefaultTemplate"
+            );
+        }
+
+        /// <summary>
+        /// Checks whether an custom template folder exists and is non-empty
+        /// </summary>
+        private static bool IsCustomTemplateAvailable()
+        {
+            string externalDir = GetCustomTemplateDir();
+            return Directory.Exists(externalDir) &&
+                Directory.EnumerateFiles(externalDir, "*", SearchOption.AllDirectories).Any();
+        }
+
+        /// <summary>
         /// Generates a new csproj from a template
         /// </summary>
         /// <returns>The path to the generated csproject</returns>
@@ -388,6 +412,13 @@ namespace HotLoader
         /// <returns>The path to the csproj entry point</returns>
         private void ExtractTemplate(string destinationFolder)
         {
+            // If there's custom project template on disk, use that
+            if (IsCustomTemplateAvailable())
+            {
+                CopyDirectoryRecursive(GetCustomTemplateDir(), destinationFolder);
+                return;
+            }
+            // Else extract the embedded template project from resources
             const string prefix = "Template/";
             Assembly assembly = Assembly.GetAssembly(typeof(HotComponentBase));
             foreach (string name in assembly.GetManifestResourceNames())
@@ -409,6 +440,33 @@ namespace HotLoader
 
                 }
             };
+        }
+
+        /// <summary>
+        /// Saves the current source code as the default template for new components.
+        /// </summary>
+        private void SaveCurrentSourceAsCustomTemplate()
+        {
+            if (m_sourcePath == null || !Directory.Exists(m_sourcePath))
+            {
+                return;
+            }
+
+            string targetDir = GetCustomTemplateDir();
+            if (Directory.Exists(targetDir))
+            {
+                Directory.Delete(targetDir, recursive: true);
+            }
+            Directory.CreateDirectory(targetDir);
+
+            CopyDirectoryRecursive(m_sourcePath, targetDir, path =>
+                Path.GetFileName(path) is string name &&
+                !ignored_folders.Contains(name));
+
+            Rhino.UI.Dialogs.ShowMessage(
+                message: $"New template project has been saved in \n{targetDir}",
+                title: "Default template updated"
+            );
         }
 
         /// <summary>
@@ -632,6 +690,18 @@ namespace HotLoader
         /// <param name="csprojPath">The path to the .csproj</param>
         private void UpdateAssemblyReferences(string csprojPath)
         {
+            string assemblyPath = GetPluginAssemblyPath();
+
+            string txt = File.ReadAllText(csprojPath);
+            string replaced = new Regex(@"(?<=<HintPath>).+HotLoader.gha(?=<\/HintPath>)").Replace(txt, assemblyPath);
+            File.WriteAllText(csprojPath, replaced);
+        }
+
+        /// <summary>
+        /// Locates the main plugin assembly, including a fallback to Grasshopper's library registry.
+        /// </summary>
+        private static string GetPluginAssemblyPath()
+        {
             Assembly assembly = Assembly.GetAssembly(typeof(HotComponentBase));
             string assemblyPath = assembly.Location;
 
@@ -641,10 +711,7 @@ namespace HotLoader
             }
 
             Debug.Assert(assemblyPath != null, "Unable to locate entry assembly.");
-
-            string txt = File.ReadAllText(csprojPath);
-            string replaced = new Regex(@"(?<=<HintPath>).+HotLoader.gha(?=<\/HintPath>)").Replace(txt, assemblyPath);
-            File.WriteAllText(csprojPath, replaced);
+            return assemblyPath;
         }
 
         /// <summary>
