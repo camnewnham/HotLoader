@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
@@ -8,12 +8,10 @@
 	<TargetExt>.ghc</TargetExt>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
-    <DebugType>full</DebugType>
-  </PropertyGroup>
-  
-  <PropertyGroup Condition="'$(Configuration)'=='Develop'">
-    <DebugType>full</DebugType>
+  <PropertyGroup Condition="'$(Configuration)'=='Debug' Or '$(Configuration)'=='Develop'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>false</Optimize>
   </PropertyGroup>
 
   <ItemGroup>

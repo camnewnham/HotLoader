@@ -19,7 +19,7 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <EmbeddedResource Include="..\Template\*.*" LogicalName="Template/%(FileName)%(Extension)" />
+    <EmbeddedResource Include="..\Template\**\*" LogicalName="Template/%(RecursiveDir)%(FileName)%(Extension)" />
   </ItemGroup>
 	
   <ItemGroup>

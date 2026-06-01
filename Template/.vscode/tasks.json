@@ -1,0 +1,13 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "rebuild",
+        "type": "process",
+        "command": "dotnet",
+        "args": ["build", "${workspaceFolder}"],
+        "problemMatcher": "$msCompile",
+        "group": { "kind": "build", "isDefault": true }
+      }
+    ]
+}

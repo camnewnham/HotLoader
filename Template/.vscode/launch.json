@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Attach to Rhino",
+        "type": "clr",
+        "request": "attach",
+        "processName": "Rhino.exe"
+      },
+      {
+        "name": "Attach manually",
+        "type": "clr",
+        "request": "attach",
+        "processId": "${command:pickProcess}"
+      }
+    ]
+  }
